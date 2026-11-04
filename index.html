@@ -173,9 +173,21 @@ const SERVICES = [
    url:'https://www.google.com/search?q={q}+クーポン&tbs=qdr:m', web:'https://www.google.com/search?q={q}+クーポン&tbs=qdr:m'},
 ];
 
-const isAndroid = /Android/i.test(navigator.userAgent);
-const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent)
-  || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+// 端末の判定。「PC版サイト」表示などでUAがPC風になっても拾えるよう、複数の手がかりを見る。
+// うまく判定できないときは画面の「端末」で手動切り替え（ブラウザに記憶）
+function detectDevice(){
+  const ua = navigator.userAgent, pf = navigator.platform || '';
+  const uad = (navigator.userAgentData && navigator.userAgentData.platform) || '';
+  const touch = navigator.maxTouchPoints || 0;
+  if (/iPhone|iPad|iPod/i.test(ua) || /iPhone|iPad|iPod/i.test(pf) || (pf === 'MacIntel' && touch > 1)) return 'ios';
+  if (/Android/i.test(ua) || /Android/i.test(uad) || (/^Linux (arm|aarch)/i.test(pf) && touch > 0)) return 'android';
+  return 'pc';
+}
+function getDevice(){
+  let v = 'auto'; try{ v = localStorage.getItem('cs_dev') || 'auto'; }catch(_){}
+  return ['ios','android','pc'].includes(v) ? v : detectDevice();
+}
+let DEV = getDevice(), isIOS = DEV === 'ios', isAndroid = DEV === 'android';
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 // 外部データ由来のリンクは http(s) だけ通す（javascript: などを防ぐ）
@@ -242,6 +254,13 @@ function svcCard(svc, q){
   </div>`;
 }
 
+document.addEventListener('change', e => {
+  if (e.target.id !== 'dev') return;
+  try{ localStorage.setItem('cs_dev', e.target.value); }catch(_){}
+  DEV = getDevice(); isIOS = DEV === 'ios'; isAndroid = DEV === 'android';
+  const q = $('#q').value.trim(); if (q) search(q);
+});
+
 async function search(q){
   q = q.trim();
   if (!q) return;
@@ -250,7 +269,15 @@ async function search(q){
 
   let html = `<div class="sec">📱 クーポンを探せるアプリ・サイト <small>タップで開く</small></div>
     <div class="grid">${SERVICES.map(s => svcCard(s, q)).join('')}</div>`;
-  if (!isIOS && !isAndroid) html += `<p class="note" style="margin-top:10px">スマホ以外ではアプリ起動の代わりに Web 検索を開きます。</p>`;
+    let manual = 'auto'; try{ manual = localStorage.getItem('cs_dev') || 'auto'; }catch(_){}
+  html += `<p class="note" style="margin-top:10px">端末：
+    <select id="dev">
+      <option value="auto"${manual === 'auto' ? ' selected' : ''}>自動（${{ios:'iPhone',android:'Android',pc:'PC'}[detectDevice()]}と判定）</option>
+      <option value="ios"${manual === 'ios' ? ' selected' : ''}>iPhone</option>
+      <option value="android"${manual === 'android' ? ' selected' : ''}>Android</option>
+      <option value="pc"${manual === 'pc' ? ' selected' : ''}>PC（Web検索）</option>
+    </select>
+    ${DEV === 'pc' ? '<br>PC扱いのため、アプリ起動の代わりに Web 検索を開きます。スマホなら上で切り替えてください。' : ''}</p>`;
   html += `<div id="live"></div>`;
   $('#out').innerHTML = html;
 
