@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>クーポンさがし</title>
+<meta name="theme-color" content="#e8553d">
+<style>
+  :root{
+    --bg:#fbf7f2; --card:#fff; --ink:#2b2420; --sub:#7a6e66; --line:#ece4db;
+    --accent:#e8553d; --accent-soft:#fde9e4; --ok:#2f8f5b;
+  }
+  *{box-sizing:border-box}
+  [hidden]{display:none!important}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:"Hiragino Sans","Noto Sans JP",system-ui,sans-serif;line-height:1.5;
+    -webkit-tap-highlight-color:transparent}
+  header{position:sticky;top:0;z-index:5;background:var(--bg);padding:14px 16px 10px;
+    border-bottom:1px solid var(--line)}
+  h1{font-size:18px;margin:0 0 10px;letter-spacing:.04em}
+  h1 span{color:var(--accent)}
+  form{display:flex;gap:8px}
+  input[type=search]{flex:1;min-width:0;font-size:16px;padding:12px 14px;border:1.5px solid var(--line);
+    border-radius:12px;background:#fff;outline:none}
+  input[type=search]:focus{border-color:var(--accent)}
+  button.go{font-size:16px;font-weight:700;padding:0 18px;border:0;border-radius:12px;
+    background:var(--accent);color:#fff}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+  .chip{font-size:13px;padding:4px 10px;border-radius:999px;background:#fff;border:1px solid var(--line);
+    color:var(--sub)}
+  main{padding:12px 16px 40px;max-width:720px;margin:0 auto}
+  .sec{margin:18px 0 8px;font-size:14px;font-weight:700;color:var(--sub);display:flex;align-items:center;gap:6px}
+  .sec small{font-weight:400}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+  .svc{display:flex;flex-direction:column;background:var(--card);border:1px solid var(--line);
+    border-radius:14px;overflow:hidden}
+  .svc a.open{display:flex;align-items:center;gap:10px;padding:12px;text-decoration:none;color:inherit;flex:1}
+  .ico{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;color:#fff;
+    font-weight:800;font-size:15px;flex:none}
+  .svc b{display:block;font-size:14px}
+  .svc em{display:block;font-style:normal;font-size:11px;color:var(--sub)}
+  .svc a.web{display:block;text-align:center;font-size:12px;padding:7px;border-top:1px solid var(--line);
+    color:var(--accent);text-decoration:none;background:#fffdfb}
+  .list{display:flex;flex-direction:column;gap:8px}
+  .item{display:flex;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:12px;
+    padding:10px 12px;text-decoration:none;color:inherit}
+  .item img{width:56px;height:56px;border-radius:8px;object-fit:cover;flex:none;background:var(--line)}
+  .item .t{font-size:14px;font-weight:600}
+  .item .m{font-size:12px;color:var(--sub)}
+  .tag{display:inline-block;font-size:11px;padding:1px 7px;border-radius:6px;background:var(--accent-soft);
+    color:var(--accent);margin-right:4px}
+  .note{font-size:12px;color:var(--sub);background:#fff;border:1px dashed var(--line);border-radius:10px;padding:10px 12px}
+  .empty{text-align:center;color:var(--sub);padding:40px 10px;font-size:14px}
+  .spin{display:inline-block;width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--accent);
+    border-radius:50%;animation:r .8s linear infinite}
+  @keyframes r{to{transform:rotate(360deg)}}
+  .top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+  .top h1{margin:0}
+  .tabs{display:flex;background:#f1e9e0;border-radius:10px;padding:3px}
+  .tabs button{border:0;background:none;font-size:13px;padding:6px 12px;border-radius:8px;color:var(--sub)}
+  .tabs button.on{background:#fff;color:var(--ink);font-weight:700;box-shadow:0 1px 2px rgba(0,0,0,.08)}
+  .doc h2{font-size:16px;margin:22px 0 8px}
+  .doc p,.doc li{font-size:14px}
+  .doc ul{padding-left:1.2em;margin:6px 0}
+  .doc a{color:var(--accent)}
+  .tbl{width:100%;border-collapse:collapse;font-size:12.5px;background:#fff;border-radius:12px;overflow:hidden}
+  .tbl th,.tbl td{border-bottom:1px solid var(--line);padding:7px 8px;text-align:left;vertical-align:top}
+  .tbl th{background:#f7f1ea;font-weight:700}
+  .ok{color:var(--ok);font-weight:700}
+  .warn{color:#b7791f;font-weight:700}
+  .credit{font-size:11px;color:var(--sub);text-align:right;margin-top:4px}
+</style>
+</head>
+<body>
+<header>
+  <div class="top">
+    <h1>🎫 クーポン<span>さがし</span></h1>
+    <nav class="tabs" id="tabs">
+      <button type="button" data-tab="search" class="on">さがす</button>
+      <button type="button" data-tab="about">説明</button>
+    </nav>
+  </div>
+  <form id="f" autocomplete="off">
+    <input id="q" type="search" placeholder="お店の名前（例：マクドナルド、すき家）" enterkeyhint="search">
+    <button class="go" type="submit">検索</button>
+  </form>
+  <div class="chips" id="hist"></div>
+</header>
+
+<main id="out">
+  <div class="empty">お店の名前を入れて検索すると、<br>クーポンがありそうなアプリ・サイトを一覧にします。</div>
+</main>
+
+<main id="about" class="doc" hidden>
+  <h2>このアプリでできること</h2>
+  <p>お店の名前で検索すると、そのお店のクーポンが配信されていそうなアプリ・サイトを一覧にします。タップするとアプリが開きます（入っていなければストアやWebへ）。</p>
+  <p>スマートニュース・PayPay などのクーポンは<b>アプリの中にしかなく、公開APIもない</b>ため、クーポンの中身まではこの画面に出せません。「どのアプリを開けばいいか」を一発で開くためのランチャーです。</p>
+
+  <h2>データの取得元（情報源）</h2>
+  <table class="tbl">
+    <tr><th>表示される場所</th><th>取得元</th><th>方式</th></tr>
+    <tr><td>📰 最新ニュース</td><td><a href="https://news.google.com/" target="_blank" rel="noopener">Google ニュース</a> の検索RSS<br>（「店名 クーポン」直近30日）</td><td>GAS が RSS を取得・30分キャッシュ／キー不要</td></tr>
+    <tr><td>🍽 ホットペッパーのクーポン</td><td><a href="https://webservice.recruit.co.jp/" target="_blank" rel="noopener">ホットペッパーグルメ Webサービス</a>（公式API）</td><td>GAS 経由・無料APIキーを設定したときだけ</td></tr>
+    <tr><td>📱 アプリ・サイト一覧</td><td>この HTML に書いたリンク表（下の表）</td><td>通信なし。検索語をリンクに埋め込むだけ</td></tr>
+    <tr><td>「Webで探す」</td><td>Google 検索（1か月以内に絞り込み）</td><td>リンクを開くだけ</td></tr>
+  </table>
+  <p class="credit">Powered by <a href="http://webservice.recruit.co.jp/" target="_blank" rel="noopener">ホットペッパーグルメ Webサービス</a></p>
+
+  <h2>アプリの開き方</h2>
+  <div id="howto"></div>
+  <p style="font-size:12px;color:var(--sub)">
+    <span class="ok">確認済み</span>＝公式資料・アプリの設定ファイル（apple-app-site-association）・使用例の記事で確かめたもの。
+    <span class="warn">未確認</span>＝資料が見つからなかった起動用アドレスを試し、開かなければ1.5秒後に App Store を開きます（その前に「アドレスが無効」と出ることがあります）。
+  </p>
+
+  <h2>参考にした資料</h2>
+  <ul>
+    <li><a href="https://developers.line.biz/ja/docs/messaging-api/using-line-url-scheme/" target="_blank" rel="noopener">LINE URLスキームでLINEの機能を使う（LINE Developers）</a></li>
+    <li><a href="https://www.hotpepper.jp/.well-known/apple-app-site-association" target="_blank" rel="noopener">ホットペッパー apple-app-site-association</a></li>
+    <li><a href="https://reliphone.jp/post-16494/" target="_blank" rel="noopener">楽天ペイのURLスキーム rakutenpay://（リリフォン）</a></li>
+    <li><a href="https://nsdev.jp/apple/ios/appstore/13499.html" target="_blank" rel="noopener">なんとかPayアプリのURLスキーム paypay:// など（nsdev）</a></li>
+    <li><a href="https://feeder.co/ja/knowledge-base/google-news-rss-feeds/" target="_blank" rel="noopener">GoogleニュースのRSSフィードURL（Feeder）</a></li>
+  </ul>
+
+  <h2>プライバシー</h2>
+  <p>検索履歴はこの端末のブラウザにだけ保存されます。GAS を使う場合、検索語は GAS（自分の Google アカウント）と Google ニュース／ホットペッパーに送られます。</p>
+</main>
+
+<script>
+/* ===== 設定 =====
+ * GAS をデプロイしたら、ウェブアプリの URL（https://script.google.com/macros/s/.../exec）をここに貼る。
+ * 空のままでもアプリ・サイトへのリンク一覧は動きます。 */
+const GAS_URL = '';
+
+/* ===== クーポンが探せるアプリ・サイト =====
+ * pkg   : Android のパッケージ名（入っていればアプリが開き、無ければ Play ストアへ）
+ * ios   : iPhone 用 {open: 起動用アドレス, store: 開けなかったとき, how: 'ul'|'scheme'|'try'|'store'}
+ *           ul=ユニバーサルリンク(確認済) / scheme=URLスキーム(確認済) / try=URLスキーム(未確認) / store=App Storeのみ
+ * web   : PC など用の検索 URL。{q} が検索語に置き換わる
+ * 増やしたいときはここに1行足すだけ。 */
+const ST = 'itms-apps://search.itunes.apple.com/WebObjects/MZSearch.woa/wa/search?media=software&term=';
+const SERVICES = [
+  {name:'スマートニュース', sub:'クーポンタブ', color:'#1b74e4', mark:'S', pkg:'jp.gocro.smartnews.android',
+   ios:{open:'smartnews://', store:'https://apps.apple.com/jp/app/id579581125', how:'try'},
+   web:'https://www.google.com/search?q={q}+クーポン+スマートニュース&tbs=qdr:m'},
+  {name:'PayPay', sub:'PayPayクーポン', color:'#ff0033', mark:'P', pkg:'jp.ne.paypay.android.app',
+   ios:{open:'paypay://', store:ST+'PayPay', how:'scheme'},
+   web:'https://www.google.com/search?q={q}+PayPayクーポン&tbs=qdr:m'},
+  {name:'au PAY', sub:'au PAYクーポン', color:'#eb5505', mark:'au', pkg:'jp.auone.wallet',
+   ios:{open:'aupay://', store:'https://apps.apple.com/jp/app/id862800897', how:'try'},
+   web:'https://www.google.com/search?q={q}+"au+PAY"+クーポン&tbs=qdr:m'},
+  {name:'グノシー', sub:'クーポンタブ', color:'#2e3a4b', mark:'G', pkg:'com.gunosy.android',
+   ios:{open:'gunosy://', store:ST+encodeURIComponent('グノシー'), how:'try'},
+   web:'https://www.google.com/search?q={q}+グノシー+クーポン&tbs=qdr:m'},
+  {name:'LINE', sub:'LINEクーポン', color:'#06c755', mark:'L', pkg:'jp.naver.line.android',
+   ios:{open:'https://line.me/R/', how:'ul'},
+   web:'https://www.google.com/search?q={q}+LINEクーポン&tbs=qdr:m'},
+  {name:'楽天ペイ', sub:'クーポン', color:'#bf0000', mark:'R', pkg:'jp.co.rakuten.pay',
+   ios:{open:'rakutenpay://', store:ST+encodeURIComponent('楽天ペイ'), how:'scheme'},
+   web:'https://www.google.com/search?q={q}+楽天ペイ+クーポン&tbs=qdr:m'},
+  {name:'d払い', sub:'クーポン', color:'#cc0033', mark:'d', pkg:'com.nttdocomo.android.wallet',
+   ios:{open:ST+encodeURIComponent('d払い'), how:'store'},
+   web:'https://www.google.com/search?q={q}+d払い+クーポン&tbs=qdr:m'},
+  {name:'ホットペッパー', sub:'グルメクーポン', color:'#e60033', mark:'H', pkg:'jp.co.recruit.mtl.android.hotpepper',
+   ios:{open:'https://www.hotpepper.jp/', how:'ul'},
+   web:'https://www.google.com/search?q=site:hotpepper.jp+{q}+クーポン'},
+  {name:'公式アプリ', sub:'ストアで店名検索', color:'#01875f', mark:'▶',
+   url:'https://play.google.com/store/search?q={q}&c=apps', ios:{open:ST+'{q}', how:'store'},
+   web:'https://www.google.com/search?q={q}+公式アプリ+クーポン'},
+  {name:'X（旧Twitter）', sub:'最新の投稿', color:'#111', mark:'𝕏',
+   url:'https://x.com/search?q={q}%20クーポン&f=live', web:'https://x.com/search?q={q}%20クーポン&f=live'},
+  {name:'Google', sub:'1か月以内の情報', color:'#4285f4', mark:'G',
+   url:'https://www.google.com/search?q={q}+クーポン&tbs=qdr:m', web:'https://www.google.com/search?q={q}+クーポン&tbs=qdr:m'},
+];
+
+const isAndroid = /Android/i.test(navigator.userAgent);
+const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent)
+  || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fill = (tpl, q) => tpl.replaceAll('{q}', encodeURIComponent(q));
+
+// タップ1回で開くリンクを作る
+function appLink(svc, q){
+  if (isIOS && svc.ios) return fill(svc.ios.open, q);
+  if (svc.url) return fill(svc.url, q);
+  if (isAndroid && svc.pkg){   // 入っていれば起動、無ければ Play ストアへ
+    const store = 'https://play.google.com/store/apps/details?id=' + svc.pkg;
+    return 'intent:#Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;'
+      + 'package=' + svc.pkg + ';S.browser_fallback_url=' + encodeURIComponent(store) + ';end';
+  }
+  return fill(svc.web, q);
+}
+
+// iPhone で URL スキームが開けなかったら App Store へ
+document.addEventListener('click', e => {
+  const a = e.target.closest('a[data-fallback]');
+  if (!a) return;
+  let left = false;
+  const mark = () => { left = true; };
+  document.addEventListener('visibilitychange', mark, {once:true});
+  window.addEventListener('pagehide', mark, {once:true});
+  window.addEventListener('blur', mark, {once:true});
+  setTimeout(() => { if (!left && !document.hidden) location.href = a.dataset.fallback; }, 1500);
+});
+
+// 検索履歴（ブラウザごと）
+function loadHist(){ try{ return JSON.parse(localStorage.getItem('cs_hist')||'[]'); }catch(_){ return []; } }
+function saveHist(q){
+  const h = [q, ...loadHist().filter(x => x !== q)].slice(0, 8);
+  try{ localStorage.setItem('cs_hist', JSON.stringify(h)); }catch(_){}
+  renderHist();
+}
+function renderHist(){
+  $('#hist').innerHTML = loadHist().map(h => `<button class="chip" type="button">${esc(h)}</button>`).join('');
+}
+$('#hist').addEventListener('click', e => {
+  if (e.target.classList.contains('chip')){ $('#q').value = e.target.textContent; search(e.target.textContent); }
+});
+
+function svcCard(svc, q){
+  const isApp = !svc.url && svc.pkg;
+  const ios = isIOS && svc.ios;
+  const hint = !isApp ? '' : (isAndroid || (ios && svc.ios.how !== 'store')) ? '・アプリを開く' : ios ? '・App Storeへ' : '';
+  // ユニバーサルリンク・URLスキームは同じタブで開く（新しいタブだとアプリが開かないことがある）
+  const sameTab = ios && svc.ios.how !== 'store' || (isAndroid && isApp);
+  const fb = ios && svc.ios.store ? ` data-fallback="${esc(fill(svc.ios.store, q))}"` : '';
+  return `<div class="svc">
+    <a class="open" href="${esc(appLink(svc, q))}"${sameTab ? '' : ' target="_blank" rel="noopener"'}${fb}>
+      <span class="ico" style="background:${svc.color}">${esc(svc.mark)}</span>
+      <span><b>${esc(svc.name)}</b><em>${esc(svc.sub)}${hint}</em></span>
+    </a>
+    ${isApp ? `<a class="web" href="${esc(fill(svc.web, q))}" target="_blank" rel="noopener">Webで「${esc(q)}」を探す ›</a>` : ''}
+  </div>`;
+}
+
+async function search(q){
+  q = q.trim();
+  if (!q) return;
+  saveHist(q);
+  history.replaceState(null, '', '?q=' + encodeURIComponent(q));
+
+  let html = `<div class="sec">📱 クーポンを探せるアプリ・サイト <small>タップで開く</small></div>
+    <div class="grid">${SERVICES.map(s => svcCard(s, q)).join('')}</div>`;
+  if (!isIOS && !isAndroid) html += `<p class="note" style="margin-top:10px">スマホ以外ではアプリ起動の代わりに Web 検索を開きます。</p>`;
+  html += `<div id="live"></div>`;
+  $('#out').innerHTML = html;
+
+  if (!GAS_URL) return;
+  const live = $('#live');
+  live.innerHTML = `<div class="sec"><span class="spin"></span> 最新のクーポン情報を取得中…</div>`;
+  try{
+    const res = await fetch(GAS_URL + '?q=' + encodeURIComponent(q));
+    const d = await res.json();
+    live.innerHTML = renderLive(d, q);
+  }catch(err){
+    live.innerHTML = `<p class="note">最新情報の取得に失敗しました（${esc(err.message)}）</p>`;
+  }
+}
+
+function renderLive(d, q){
+  let h = '';
+  if (d.hotpepper && d.hotpepper.length){
+    h += `<div class="sec">🍽 ホットペッパーのクーポン <small>${d.hotpepper.length}件</small></div><div class="list">`;
+    h += d.hotpepper.map(s => `<a class="item" href="${esc(s.couponUrl || s.url)}" target="_blank" rel="noopener">
+      ${s.photo ? `<img src="${esc(s.photo)}" alt="" loading="lazy">` : ''}
+      <div><div class="t">${esc(s.name)}</div>
+      <div class="m"><span class="tag">${esc(s.genre || 'グルメ')}</span>${esc(s.access || s.address || '')}</div></div></a>`).join('');
+    h += `</div><div class="credit">Powered by <a href="http://webservice.recruit.co.jp/" target="_blank" rel="noopener">ホットペッパーグルメ Webサービス</a></div>`;
+  }
+  const news = d.news || [];
+  h += `<div class="sec">📰 「${esc(q)} クーポン」の最新ニュース <small>Google ニュース・30日以内</small></div>`;
+  if (news.length){
+    h += `<div class="list">` + news.map(n => `<a class="item" href="${esc(n.link)}" target="_blank" rel="noopener">
+      <div><div class="t">${esc(n.title)}</div>
+      <div class="m">${n.source ? `<span class="tag">${esc(n.source)}</span>` : ''}${esc(fmtDate(n.date))}</div></div></a>`).join('') + `</div>`;
+  } else {
+    h += `<p class="note">直近30日のクーポン関連ニュースは見つかりませんでした。上のアプリで直接確認してください。</p>`;
+  }
+  return h;
+}
+
+function fmtDate(s){
+  const t = new Date(s);
+  if (isNaN(t)) return '';
+  return `${t.getMonth()+1}/${t.getDate()} ${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}`;
+}
+
+// 説明タブの「アプリの開き方」表（SERVICES から自動生成）
+const HOW = {ul:['ユニバーサルリンク','ok','確認済み'], scheme:['URLスキーム','ok','確認済み'],
+             try:['URLスキーム','warn','未確認'], store:['App Store','','—']};
+$('#howto').innerHTML = `<table class="tbl"><tr><th>アプリ</th><th>Android</th><th>iPhone</th></tr>` +
+  SERVICES.map(s => {
+    const and = s.pkg && !s.url ? 'アプリ起動' : s.url && s.url.includes('play.google') ? 'Playストア検索' : 'Web';
+    const h = s.ios ? HOW[s.ios.how] : null;
+    const ios = h ? `${h[0]}${h[1] ? `<br><span class="${h[1]}">${h[2]}</span>` : ''}` : 'Web';
+    return `<tr><td>${esc(s.name)}</td><td>${and}</td><td>${ios}</td></tr>`;
+  }).join('') + `</table>`;
+
+$('#tabs').addEventListener('click', e => {
+  const b = e.target.closest('button[data-tab]'); if (!b) return;
+  const about = b.dataset.tab === 'about';
+  document.querySelectorAll('#tabs button').forEach(x => x.classList.toggle('on', x === b));
+  $('#about').hidden = !about; $('#out').hidden = about;
+  $('#f').hidden = about; $('#hist').hidden = about;
+  window.scrollTo(0, 0);
+});
+
+$('#f').addEventListener('submit', e => { e.preventDefault(); $('#q').blur(); search($('#q').value); });
+renderHist();
+const first = new URLSearchParams(location.search).get('q');
+if (first){ $('#q').value = first; search(first); }
+</script>
+</body>
+</html>
