@@ -27,14 +27,18 @@ function doGet(e) {
   const hit = cache.get(key);
   if (hit) return ContentService.createTextOutput(hit).setMimeType(ContentService.MimeType.JSON);
 
+  // 取得に失敗した項目は news: null（0件の [] と区別する）。失敗を含む結果はキャッシュしない
+  let failed = false;
   const out = {
     q: q,
-    news: safe_(() => getNews_(q), []),
-    hotpepper: safe_(() => getHotpepper_(q), null),
+    news: safe_(() => getNews_(q), null, () => { failed = true; }),
+    hotpepper: safe_(() => getHotpepper_(q), null, () => { failed = true; }),
     fetchedAt: new Date().toISOString(),
   };
   const body = JSON.stringify(out);
-  try { cache.put(key, body, CACHE_SECONDS); } catch (_) { /* 100KB超などは無視 */ }
+  if (!failed) {
+    try { cache.put(key, body, CACHE_SECONDS); } catch (_) { /* 100KB超などは無視 */ }
+  }
   return ContentService.createTextOutput(body).setMimeType(ContentService.MimeType.JSON);
 }
 
@@ -43,7 +47,7 @@ function getNews_(q) {
   const query = q + ' クーポン when:30d';
   const url = 'https://news.google.com/rss/search?q=' + encodeURIComponent(query) + '&hl=ja&gl=JP&ceid=JP:ja';
   const res = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
-  if (res.getResponseCode() !== 200) return [];
+  if (res.getResponseCode() !== 200) throw new Error('news http ' + res.getResponseCode());
 
   const channel = XmlService.parse(res.getContentText()).getRootElement().getChild('channel');
   return channel.getChildren('item').slice(0, 20).map(function (it) {
@@ -66,9 +70,11 @@ function getHotpepper_(q) {
     + '&keyword=' + encodeURIComponent(q)
     + '&count=20&format=json';
   const res = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
-  if (res.getResponseCode() !== 200) return [];
+  if (res.getResponseCode() !== 200) throw new Error('hotpepper http ' + res.getResponseCode());
 
-  const shops = (JSON.parse(res.getContentText()).results || {}).shop || [];
+  const results = JSON.parse(res.getContentText()).results || {};
+  if (results.error) throw new Error('hotpepper api error ' + JSON.stringify(results.error));
+  const shops = results.shop || [];
   return shops.map(function (s) {
     return {
       name: s.name,
@@ -82,8 +88,13 @@ function getHotpepper_(q) {
   });
 }
 
-function safe_(fn, fallback) {
-  try { return fn(); } catch (err) { console.error(err); return fallback; }
+function safe_(fn, fallback, onError) {
+  try { return fn(); } catch (err) {
+    // 例外メッセージにURL（= APIキー）が含まれることがあるので、ログには伏せて出す
+    console.error(String(err && err.message || err).replace(/([?&]key=)[^&\s]+/g, '$1***'));
+    if (onError) onError();
+    return fallback;
+  }
 }
 
 function json_(obj) {

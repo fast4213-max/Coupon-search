@@ -178,6 +178,8 @@ const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent)
   || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+// 外部データ由来のリンクは http(s) だけ通す（javascript: などを防ぐ）
+const safeUrl = u => /^https?:\/\//i.test(String(u || '')) ? String(u) : '#';
 const fill = (tpl, q) => tpl.replaceAll('{q}', encodeURIComponent(q));
 
 // タップ1回で開くリンクを作る
@@ -197,11 +199,16 @@ document.addEventListener('click', e => {
   const a = e.target.closest('a[data-fallback]');
   if (!a) return;
   let left = false;
+  const ac = new AbortController();   // 1.5秒後に監視をまとめて解除（タップのたびにリスナーが溜まらないように）
   const mark = () => { left = true; };
-  document.addEventListener('visibilitychange', mark, {once:true});
-  window.addEventListener('pagehide', mark, {once:true});
-  window.addEventListener('blur', mark, {once:true});
-  setTimeout(() => { if (!left && !document.hidden) location.href = a.dataset.fallback; }, 1500);
+  const opt = {once:true, signal:ac.signal};
+  document.addEventListener('visibilitychange', mark, opt);
+  window.addEventListener('pagehide', mark, opt);
+  window.addEventListener('blur', mark, opt);
+  setTimeout(() => {
+    ac.abort();
+    if (!left && !document.hidden) location.href = a.dataset.fallback;
+  }, 1500);
 });
 
 // 検索履歴（ブラウザごと）
@@ -223,7 +230,8 @@ function svcCard(svc, q){
   const ios = isIOS && svc.ios;
   const hint = !isApp ? '' : (isAndroid || (ios && svc.ios.how !== 'store')) ? '・アプリを開く' : ios ? '・App Storeへ' : '';
   // ユニバーサルリンク・URLスキームは同じタブで開く（新しいタブだとアプリが開かないことがある）
-  const sameTab = ios && svc.ios.how !== 'store' || (isAndroid && isApp);
+  // itms-apps:// も新しいタブで開くと空タブが残るので、iPhone は常に同じタブ
+  const sameTab = !!ios || (isAndroid && isApp);
   const fb = ios && svc.ios.store ? ` data-fallback="${esc(fill(svc.ios.store, q))}"` : '';
   return `<div class="svc">
     <a class="open" href="${esc(appLink(svc, q))}"${sameTab ? '' : ' target="_blank" rel="noopener"'}${fb}>
@@ -249,12 +257,19 @@ async function search(q){
   if (!GAS_URL) return;
   const live = $('#live');
   live.innerHTML = `<div class="sec"><span class="spin"></span> 最新のクーポン情報を取得中…</div>`;
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), 20000);   // GAS の初回起動は遅いことがある
   try{
-    const res = await fetch(GAS_URL + '?q=' + encodeURIComponent(q));
+    const res = await fetch(GAS_URL + '?q=' + encodeURIComponent(q), {signal: ac.signal});
+    if (!res.ok) throw new Error('HTTP ' + res.status);
     const d = await res.json();
+    if (d.error) throw new Error(d.error);
     live.innerHTML = renderLive(d, q);
   }catch(err){
-    live.innerHTML = `<p class="note">最新情報の取得に失敗しました（${esc(err.message)}）</p>`;
+    const msg = err.name === 'AbortError' ? '時間切れです' : err.message;
+    live.innerHTML = `<p class="note">最新情報の取得に失敗しました（${esc(msg)}）。上のアプリは使えます。</p>`;
+  }finally{
+    clearTimeout(timer);
   }
 }
 
@@ -262,16 +277,18 @@ function renderLive(d, q){
   let h = '';
   if (d.hotpepper && d.hotpepper.length){
     h += `<div class="sec">🍽 ホットペッパーのクーポン <small>${d.hotpepper.length}件</small></div><div class="list">`;
-    h += d.hotpepper.map(s => `<a class="item" href="${esc(s.couponUrl || s.url)}" target="_blank" rel="noopener">
-      ${s.photo ? `<img src="${esc(s.photo)}" alt="" loading="lazy">` : ''}
+    h += d.hotpepper.map(s => `<a class="item" href="${esc(safeUrl(s.couponUrl || s.url))}" target="_blank" rel="noopener">
+      ${s.photo ? `<img src="${esc(safeUrl(s.photo))}" alt="" loading="lazy">` : ''}
       <div><div class="t">${esc(s.name)}</div>
       <div class="m"><span class="tag">${esc(s.genre || 'グルメ')}</span>${esc(s.access || s.address || '')}</div></div></a>`).join('');
     h += `</div><div class="credit">Powered by <a href="http://webservice.recruit.co.jp/" target="_blank" rel="noopener">ホットペッパーグルメ Webサービス</a></div>`;
   }
   const news = d.news || [];
   h += `<div class="sec">📰 「${esc(q)} クーポン」の最新ニュース <small>Google ニュース・30日以内</small></div>`;
-  if (news.length){
-    h += `<div class="list">` + news.map(n => `<a class="item" href="${esc(n.link)}" target="_blank" rel="noopener">
+  if (d.news === null){
+    h += `<p class="note">ニュースの取得に失敗しました。少し待ってからもう一度検索してください。</p>`;
+  } else if (news.length){
+    h += `<div class="list">` + news.map(n => `<a class="item" href="${esc(safeUrl(n.link))}" target="_blank" rel="noopener">
       <div><div class="t">${esc(n.title)}</div>
       <div class="m">${n.source ? `<span class="tag">${esc(n.source)}</span>` : ''}${esc(fmtDate(n.date))}</div></div></a>`).join('') + `</div>`;
   } else {
