@@ -134,6 +134,7 @@ const GAS_URL = 'https://script.google.com/macros/s/AKfycbw2KeqMOMXXJEqj9xeVwS5q
 
 /* ===== クーポンが探せるアプリ・サイト =====
  * pkg   : Android のパッケージ名
+ * asch  : Android 用の URL スキーム名（アプリが https のルートを受け付けない場合に aurl より優先）
  * aurl  : Android 用のアプリリンク（公式ドメインの https。assetlinks.json でパッケージとの紐づけを確認したもの）。
  *         入っていればアプリが開き、無ければ Play ストアへ。aurl が無いアプリは Play ストアの詳細ページへ
  * ios   : iPhone 用 {open: 起動用アドレス, store: 開けなかったとき, how: 'ul'|'scheme'|'try'|'store'}
@@ -142,10 +143,10 @@ const GAS_URL = 'https://script.google.com/macros/s/AKfycbw2KeqMOMXXJEqj9xeVwS5q
  * 増やしたいときはここに1行足すだけ。 */
 const ST = 'itms-apps://search.itunes.apple.com/WebObjects/MZSearch.woa/wa/search?media=software&term=';
 const SERVICES = [
-  {name:'スマートニュース', sub:'クーポンタブ', color:'#1b74e4', mark:'S', pkg:'jp.gocro.smartnews.android', aurl:'https://www.smartnews.com/',
+  {name:'スマートニュース', sub:'クーポンタブ', color:'#1b74e4', mark:'S', pkg:'jp.gocro.smartnews.android', aurl:'https://www.smartnews.com/', asch:'smartnews',
    ios:{open:'smartnews://', store:'https://apps.apple.com/jp/app/id579581125', how:'try'},
    web:'https://www.google.com/search?q={q}+クーポン+スマートニュース&tbs=qdr:m'},
-  {name:'PayPay', sub:'PayPayクーポン', color:'#ff0033', mark:'P', pkg:'jp.ne.paypay.android.app', aurl:'https://paypay.ne.jp/',
+  {name:'PayPay', sub:'PayPayクーポン', color:'#ff0033', mark:'P', pkg:'jp.ne.paypay.android.app', aurl:'https://paypay.ne.jp/', asch:'paypay',
    ios:{open:'paypay://', store:ST+'PayPay', how:'scheme'},
    web:'https://www.google.com/search?q={q}+PayPayクーポン&tbs=qdr:m'},
   {name:'au PAY', sub:'au PAYクーポン', color:'#eb5505', mark:'au', pkg:'jp.auone.wallet', aurl:'https://wallet.auone.jp/',
@@ -154,8 +155,8 @@ const SERVICES = [
   {name:'グノシー', sub:'クーポンタブ', color:'#2e3a4b', mark:'G', pkg:'com.gunosy.android', aurl:'https://gunosy.com/',
    ios:{open:'gunosy://', store:ST+encodeURIComponent('グノシー'), how:'try'},
    web:'https://www.google.com/search?q={q}+グノシー+クーポン&tbs=qdr:m'},
-  {name:'LINE', sub:'LINEクーポン', color:'#06c755', mark:'L', pkg:'jp.naver.line.android', aurl:'https://line.me/R/',
-   ios:{open:'https://line.me/R/', how:'ul'},
+  {name:'LINE', sub:'LINEクーポン', color:'#06c755', mark:'L', pkg:'jp.naver.line.android', aurl:'https://line.me/R/nv/wallet',
+   ios:{open:'https://line.me/R/nv/wallet', how:'ul'},
    web:'https://www.google.com/search?q={q}+LINEクーポン&tbs=qdr:m'},
   {name:'楽天ペイ', sub:'クーポン', color:'#bf0000', mark:'R', pkg:'jp.co.rakuten.pay', aurl:'https://pay.rakuten.co.jp/',
    ios:{open:'rakutenpay://', store:ST+encodeURIComponent('楽天ペイ'), how:'scheme'},
@@ -204,6 +205,9 @@ function appLink(svc, q){
     // Chrome は BROWSABLE を宣言した画面しか起動できない（アプリ本体の起動画面 LAUNCHER は不可）。
     // そのため、アプリが対応している https のアプリリンクを、パッケージ指定つきで開く
     const store = 'https://play.google.com/store/apps/details?id=' + svc.pkg;
+    if (svc.asch)   // 例: paypay:// → intent://#Intent;scheme=paypay;package=...
+      return 'intent://#Intent;scheme=' + svc.asch + ';package=' + svc.pkg
+        + ';S.browser_fallback_url=' + encodeURIComponent(store) + ';end';
     if (!svc.aurl) return store;
     const u = new URL(svc.aurl);
     return 'intent://' + u.host + u.pathname + '#Intent;scheme=https;package=' + svc.pkg
@@ -246,7 +250,7 @@ $('#hist').addEventListener('click', e => {
 function svcCard(svc, q){
   const isApp = !svc.url && svc.pkg;
   const ios = isIOS && svc.ios;
-  const hint = !isApp ? '' : (isAndroid ? (svc.aurl ? '・アプリを開く' : '・ストアへ') : (ios && svc.ios.how !== 'store') ? '・アプリを開く' : ios ? '・App Storeへ' : '');
+  const hint = !isApp ? '' : (isAndroid ? ((svc.aurl || svc.asch) ? '・アプリを開く' : '・ストアへ') : (ios && svc.ios.how !== 'store') ? '・アプリを開く' : ios ? '・App Storeへ' : '');
   // ユニバーサルリンク・URLスキームは同じタブで開く（新しいタブだとアプリが開かないことがある）
   // itms-apps:// も新しいタブで開くと空タブが残るので、iPhone は常に同じタブ
   const sameTab = !!ios || (isAndroid && isApp);
@@ -341,7 +345,7 @@ const HOW = {ul:['ユニバーサルリンク','ok','確認済み'], scheme:['UR
              try:['URLスキーム','warn','未確認'], store:['App Store','','—']};
 $('#howto').innerHTML = `<table class="tbl"><tr><th>アプリ</th><th>Android</th><th>iPhone</th></tr>` +
   SERVICES.map(s => {
-    const and = s.pkg && !s.url ? (s.aurl ? 'アプリリンク' : 'Playストア') : s.url && s.url.includes('play.google') ? 'Playストア検索' : 'Web';
+    const and = s.pkg && !s.url ? (s.asch ? 'URLスキーム' : s.aurl ? 'アプリリンク' : 'Playストア') : s.url && s.url.includes('play.google') ? 'Playストア検索' : 'Web';
     const h = s.ios ? HOW[s.ios.how] : null;
     const ios = h ? `${h[0]}${h[1] ? `<br><span class="${h[1]}">${h[2]}</span>` : ''}` : 'Web';
     return `<tr><td>${esc(s.name)}</td><td>${and}</td><td>${ios}</td></tr>`;
